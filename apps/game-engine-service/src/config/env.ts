@@ -1,3 +1,8 @@
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+
+config({ path: resolve(process.cwd(), '..', '..', '.env') });
+
 function readNumberEnv(name: string, fallback: number): number {
   const rawValue = process.env[name];
   if (!rawValue) {

@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 
+import { authLobbyEnv } from '../config/env';
 import { authService } from '../services/auth.service';
 import { UsersRepository } from '../repositories/users.repository';
 import type { CurrentUserResponse } from '../contracts';
@@ -7,26 +9,24 @@ import type { CurrentUserResponse } from '../contracts';
 const usersRepository = new UsersRepository();
 
 export class AuthController {
-  async githubLogin(request: Request, response: Response) {
-    const { githubId, username, avatarUrl, displayName } = request.body as {
-      githubId?: string;
-      username?: string;
-      avatarUrl?: string;
-      displayName?: string;
-    };
+  githubStart(_request: Request, response: Response) {
+    const state = randomUUID();
+    return response.redirect(authService.buildGithubAuthorizeUrl(state));
+  }
 
-    if (!githubId || !username || !avatarUrl || !displayName) {
-      return response.status(400).json({ message: 'githubId, username, avatarUrl, and displayName are required.' });
+  async githubCallback(request: Request, response: Response) {
+    const code = typeof request.query.code === 'string' ? request.query.code : null;
+
+    if (!code) {
+      return response.status(400).send('Missing GitHub OAuth code.');
     }
 
-    const session = await authService.authenticateGitHubUser({
-      githubId,
-      username,
-      avatarUrl,
-      displayName,
-    });
+    const session = await authService.exchangeGithubCode(code);
+    const redirectUrl = new URL('/auth/callback', authLobbyEnv.frontendUrl);
+    redirectUrl.searchParams.set('token', session.token);
+    redirectUrl.searchParams.set('userId', session.userId);
 
-    return response.status(200).json(session);
+    return response.redirect(redirectUrl.toString());
   }
 
   async me(request: Request, response: Response) {

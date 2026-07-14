@@ -26,13 +26,6 @@ async function request<T>(baseUrl: string, path: string, init: RequestInit = {})
   return response.json() as Promise<T>;
 }
 
-export interface LoginPayload {
-  githubId: string;
-  username: string;
-  avatarUrl: string;
-  displayName: string;
-}
-
 export interface CurrentUserResponse {
   user: {
     id: string;
@@ -48,11 +41,8 @@ export interface CurrentUserResponse {
   };
 }
 
-export async function loginWithGitHub(payload: LoginPayload) {
-  return request<{ userId: string; token: string }>(authBaseUrl, '/auth/github', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+export function loginWithGitHub() {
+  window.location.assign(`${authBaseUrl}/auth/github/start`);
 }
 
 export async function getCurrentUser() {

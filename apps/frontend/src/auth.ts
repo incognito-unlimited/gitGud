@@ -12,6 +12,20 @@ export function clearToken() {
   localStorage.removeItem(tokenKey);
 }
 
+export function setTokenFromUrl() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('token');
+
+  if (token) {
+    setToken(token);
+    url.searchParams.delete('token');
+    url.searchParams.delete('userId');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  }
+
+  return token;
+}
+
 export function readJsonResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }

@@ -21,13 +21,6 @@ import type { MatchInitializationResponse, MatchStateDto, TaskSubmissionResponse
 
 type CurrentUser = Awaited<ReturnType<typeof getCurrentUser>>['user'];
 
-const demoProfile = {
-  githubId: 'demo-github-1',
-  username: 'demouser',
-  avatarUrl: 'https://github.com/github.png',
-  displayName: 'Demo User',
-};
-
 function useAuthState() {
   const [token, setTokenState] = useState<string | null>(getToken());
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -71,12 +64,8 @@ function useAuthState() {
     token,
     user,
     loading,
-    async login() {
-      const session = await loginWithGitHub(demoProfile);
-      setToken(session.token);
-      setTokenState(session.token);
-      const current = await getCurrentUser();
-      setUser(current.user);
+    login() {
+      loginWithGitHub();
     },
     async signOut() {
       await logout().catch(() => null);
@@ -103,6 +92,7 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<LandingPage isAuthed={Boolean(auth.token)} />} />
           <Route path="/login" element={<LoginPage onLogin={auth.login} isAuthed={Boolean(auth.token)} />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/dashboard" element={<RequireAuth token={auth.token} user={auth.user}><DashboardPage user={auth.user} /></RequireAuth>} />
           <Route path="/lobbies/new" element={<RequireAuth token={auth.token} user={auth.user}><CreateLobbyPage /></RequireAuth>} />
           <Route path="/lobbies/:lobbyId" element={<RequireAuth token={auth.token} user={auth.user}><LobbyPage currentUserId={auth.user?.id ?? ''} /></RequireAuth>} />
@@ -162,7 +152,7 @@ function LandingPage({ isAuthed }: { isAuthed: boolean }) {
   );
 }
 
-function LoginPage({ onLogin, isAuthed }: { onLogin: () => Promise<void>; isAuthed: boolean }) {
+function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boolean }) {
   const navigate = useNavigate();
 
   if (isAuthed) {
@@ -175,10 +165,37 @@ function LoginPage({ onLogin, isAuthed }: { onLogin: () => Promise<void>; isAuth
         <p className="kicker">Authentication</p>
         <h2>Sign in to GitGud</h2>
         <p className="muted">Use GitHub OAuth or the existing auth flow, then JWT is stored locally and attached automatically.</p>
-        <button className="button dark" onClick={async () => { await onLogin(); navigate('/dashboard'); }}>Continue with GitHub</button>
+        <button className="button dark" onClick={onLogin}>Continue with GitHub</button>
       </div>
       <div className="preview-panel small" aria-hidden="true">
         <div className="preview-box">OAuth consent preview</div>
+      </div>
+    </div>
+  );
+}
+
+function AuthCallbackPage() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('token');
+
+    if (token) {
+      setToken(token);
+      window.location.assign('/dashboard');
+      return;
+    }
+
+    navigate('/login', { replace: true });
+  }, [navigate]);
+
+  return (
+    <div className="auth-layout">
+      <div className="auth-card">
+        <p className="kicker">Authentication</p>
+        <h2>Completing login</h2>
+        <p className="muted">Finalizing the GitHub OAuth callback.</p>
       </div>
     </div>
   );
