@@ -19,10 +19,24 @@ export function DashboardPage({ user }: DashboardPageProps) {
       </nav>
 
       {/* Main Content Area */}
-      <div className="dashboard-main">
+      <div className="dashboard-main" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
+        {/* Top Bar: Search & Profile */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 24px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '400px' }}>
+            <span style={{ color: 'var(--accent-color)' }}>🔍</span>
+            <input type="text" placeholder="Search rooms, players, tasks..." style={{ margin: 0, border: 'none', background: 'transparent', flex: 1, padding: '4px', outline: 'none', boxShadow: 'none' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '4px' }}></div>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', fontSize: '0.9rem', border: '1px solid var(--border-color)' }}>
+              {user?.displayName?.[0] ?? 'P0'}
+            </div>
+          </div>
+        </div>
+
         {/* Top Row: Profile & Quick Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px' }}>
           
           <div className="surface" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -71,7 +85,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
         </div>
 
         {/* Stats Row */}
-        <div className="mini-grid compact" style={{ marginBottom: '24px' }}>
+        <div className="mini-grid compact">
           <div className="surface stat" style={{ alignItems: 'flex-start', padding: '16px 24px' }}>
             <span className="kicker">Win Rate</span>
             <span className="stat-value" style={{ marginTop: '8px' }}>62%</span>
