@@ -47,7 +47,18 @@ export function VotingResult({ onClose }: { onClose?: () => void }) {
             {tallies.map((tally, idx) => (
               <div key={idx} className="tally-row">
                 <span style={{ fontSize: '0.9rem', fontWeight: tally.votes > 0 ? 600 : 400 }}>{tally.name}</span>
+                {/*
                 <div className="tally-bar-bg">
+                  <div 
+                    className="tally-bar-fill" 
+                    style={{ 
+                      width: `${(tally.votes / maxVotes) * 100}%`,
+                      background: tally.name === '@null_ninja' ? 'var(--danger-color)' : 'var(--text-primary)'
+                    }} 
+                  />
+                </div>
+                */}
+                <div className="tally-bar-bg" style={{ border: '1px solid var(--border-color)', background: 'transparent' }}>
                   <div 
                     className="tally-bar-fill" 
                     style={{ 
