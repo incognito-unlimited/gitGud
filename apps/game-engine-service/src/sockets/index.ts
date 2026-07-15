@@ -72,6 +72,14 @@ export function registerGameSockets(io: Server) {
       socket.to(`lobby:${lobbyId}`).emit('lobby:changed');
     });
 
+    socket.on('editor:change', (payload: { matchId: string; file: string; content: string }) => {
+      socket.to(matchRoom(payload.matchId)).emit('editor:change', payload);
+    });
+
+    socket.on('chat:message', (payload: { matchId: string; username: string; text: string }) => {
+      io.to(matchRoom(payload.matchId)).emit('chat:message', payload);
+    });
+
     socket.on('task:submit', async (payload: { matchId: string; token: string; taskText: string }) => {
       try {
         verifyGameToken(payload.token);

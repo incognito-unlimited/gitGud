@@ -1,9 +1,118 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { RoleReveal } from '../components/RoleReveal';
+import { getMatch, submitTask } from '../api';
+import { getGameSocket } from '../socket';
+import { getToken } from '../auth';
 
 export function MatchPage({ currentUserId }: { currentUserId?: string }) {
+  const { matchId } = useParams();
+  const navigate = useNavigate();
   const [showRoleReveal, setShowRoleReveal] = useState(true);
   const [activeTab, setActiveTab] = useState('Feed.tsx');
+  
+  const [matchState, setMatchState] = useState<any>(null);
+  const [files, setFiles] = useState<Record<string, string>>({
+    'Feed.tsx': `import { useEffect, useState } from "react";
+import { fetchPosts } from "../api/posts";
+
+export function Feed() {
+  const [posts, setPosts] = useState([]);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    fetchPosts(page).then(setPosts); // TODO: append, not replace
+  }, [page]);
+
+  return (
+    <div>
+      // .. editor placeholder ..
+    </div>
+  );
+}`,
+    'posts.ts': `export async function fetchPosts(page: number) {
+  return [];
+}`,
+    'useAuth.ts': `export function useAuth() { return null; }`,
+  });
+  
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [submittingTask, setSubmittingTask] = useState(false);
+
+  useEffect(() => {
+    if (!matchId) return;
+
+    let mounted = true;
+    getMatch(matchId).then((res) => {
+      if (mounted) setMatchState(res);
+    }).catch(e => console.error('Failed to load match', e));
+
+    const socket = getGameSocket();
+    socket.connect();
+    
+    socket.emit('match:join', { matchId, token: getToken() });
+
+    const onEditorChange = (payload: any) => {
+      setFiles(prev => ({ ...prev, [payload.file]: payload.content }));
+    };
+
+    const onChatMessage = (payload: any) => {
+      setChatMessages(prev => [...prev, payload]);
+    };
+
+    const onSubmissionReviewed = (payload: any) => {
+      // Just add a chat message or alert
+      setChatMessages(prev => [...prev, { username: 'system', text: `Task submitted by ${payload.userId} - Score: ${payload.review?.score ?? 0}`, isSystem: true }]);
+    };
+
+    socket.on('editor:change', onEditorChange);
+    socket.on('chat:message', onChatMessage);
+    socket.on('submission:reviewed', onSubmissionReviewed);
+
+    return () => {
+      mounted = false;
+      socket.off('editor:change', onEditorChange);
+      socket.off('chat:message', onChatMessage);
+      socket.off('submission:reviewed', onSubmissionReviewed);
+      socket.emit('match:leave', { matchId });
+    };
+  }, [matchId]);
+
+  const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setFiles(prev => ({ ...prev, [activeTab]: newContent }));
+    if (matchId) {
+      getGameSocket().emit('editor:change', { matchId, file: activeTab, content: newContent });
+    }
+  };
+
+  const handleSendChat = () => {
+    if (!chatInput.trim() || !matchId) return;
+    const msg = { matchId, username: currentUserId ?? 'guest', text: chatInput };
+    getGameSocket().emit('chat:message', msg);
+    setChatMessages(prev => [...prev, msg]);
+    setChatInput('');
+  };
+
+  const handleSubmitTask = async () => {
+    if (!matchId || !matchState) return;
+    try {
+      setSubmittingTask(true);
+      await submitTask(matchId, files[activeTab]);
+    } catch (e) {
+      alert('Failed to submit task');
+    } finally {
+      setSubmittingTask(false);
+    }
+  };
+
+  if (!matchState) {
+    return <div style={{ padding: '48px', textAlign: 'center' }}>Loading match...</div>;
+  }
+
+  const role = matchState.match?.roleAssignments?.[currentUserId ?? ''] ?? 'CREWMATE';
+  const roleName = role.toUpperCase();
 
   return (
     <>
@@ -32,10 +141,10 @@ export function MatchPage({ currentUserId }: { currentUserId?: string }) {
             </div>
             <div style={{ border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span className="muted">Role:</span>
-              <div style={{ background: 'var(--text-primary)', color: 'var(--bg-main)', padding: '2px 8px', borderRadius: '2px', fontSize: '0.8rem', fontWeight: 600 }}>CREWMATE</div>
+              <div style={{ background: roleName === 'IMPOSTER' ? 'var(--danger-color)' : 'var(--text-primary)', color: 'var(--bg-main)', padding: '2px 8px', borderRadius: '2px', fontSize: '0.8rem', fontWeight: 600 }}>{roleName}</div>
             </div>
             <button className="button ghost">Settings</button>
-            <button className="button ghost">Leave</button>
+            <button className="button ghost" onClick={() => navigate('/dashboard')}>Leave</button>
           </div>
         </div>
 
@@ -46,21 +155,16 @@ export function MatchPage({ currentUserId }: { currentUserId?: string }) {
               <p className="kicker">MY TASKS · 3 OF 5</p>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div className="task-card completed">
-                <span style={{ color: 'var(--success-color)' }}>☑</span> Fix null check in &lt;Header/&gt;
-              </div>
-              <div className="task-card completed">
-                <span style={{ color: 'var(--success-color)' }}>☑</span> Add loading state to feed
-              </div>
-              <div className="task-card active">
-                <span className="muted">◐</span> Integrate /api/posts pagination
-              </div>
-              <div className="task-card">
-                <span className="muted">☐</span> Refactor useAuth to hook
-              </div>
-              <div className="task-card">
-                <span className="muted">☐</span> Write test for postReducer
-              </div>
+              {matchState.tasks?.map((t: any) => (
+                <div key={t.id} className={`task-card ${t.status === 'completed' ? 'completed' : t.status === 'in_progress' ? 'active' : ''}`}>
+                  <span style={{ color: t.status === 'completed' ? 'var(--success-color)' : 'var(--text-muted)' }}>
+                    {t.status === 'completed' ? '☑' : t.status === 'in_progress' ? '◐' : '☐'}
+                  </span> {t.title}
+                </div>
+              ))}
+              {matchState.tasks?.length === 0 && (
+                <div className="muted" style={{ padding: '8px' }}>No tasks assigned.</div>
+              )}
             </div>
             
             <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
@@ -108,36 +212,20 @@ export function MatchPage({ currentUserId }: { currentUserId?: string }) {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {/* Tabs */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)' }}>
-                {['Feed.tsx *', 'posts.ts *', 'useAuth.ts ×'].map(tab => (
-                  <div key={tab} className={`editor-tab ${tab === 'Feed.tsx *' ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+                {Object.keys(files).map(tab => (
+                  <div key={tab} className={`editor-tab ${tab === activeTab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
                     {tab}
                   </div>
                 ))}
               </div>
               {/* Code Content */}
-              <div style={{ flex: 1, padding: '16px', overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.9rem', lineHeight: 1.6, display: 'flex' }}>
-                <div style={{ width: '30px', color: 'var(--text-muted)', textAlign: 'right', paddingRight: '12px', userSelect: 'none' }}>
-                  {Array.from({length: 22}).map((_, i) => <div key={i}>{i+1}</div>)}
-                </div>
-                <div style={{ flex: 1, whiteSpace: 'pre' }}>
-                  <span style={{ color: '#c678dd' }}>import</span> {'{'} useEffect, useState {'}'} <span style={{ color: '#c678dd' }}>from</span> <span style={{ color: '#98c379' }}>"react"</span>;{'\n'}
-                  <span style={{ color: '#c678dd' }}>import</span> {'{'} fetchPosts {'}'} <span style={{ color: '#c678dd' }}>from</span> <span style={{ color: '#98c379' }}>"../api/posts"</span>;{'\n'}
-                  {'\n'}
-                  <span style={{ color: '#c678dd' }}>export function</span> <span style={{ color: '#61afef' }}>Feed</span>() {'{'}{'\n'}
-                  {'  '}<span style={{ color: '#c678dd' }}>const</span> [posts, setPosts] = useState([]);{'\n'}
-                  {'  '}<span style={{ color: '#c678dd' }}>const</span> [page, setPage] = useState(1);{'\n'}
-                  {'\n'}
-                  {'  '}useEffect(() <span style={{ color: '#c678dd' }}>=&gt;</span> {'{'}{'\n'}
-                  <div style={{ background: 'rgba(255,255,255,0.1)', display: 'inline-block', width: '100%' }}>{'    '}fetchPosts(page).then(setPosts); <span style={{ color: 'var(--text-muted)' }}>// TODO: append, not replace</span></div>{'\n'}
-                  {'  '}{'}'}, [page]);{'\n'}
-                  {'\n'}
-                  {'  '}<span style={{ color: '#c678dd' }}>return</span> ({'\n'}
-                  {'    '}&lt;<span style={{ color: '#e06c75' }}>div</span>&gt;{'\n'}
-                  {'      '}<span style={{ color: 'var(--text-muted)' }}>// .. editor placeholder ..</span>{'\n'}
-                  {'    '}&lt;/<span style={{ color: '#e06c75' }}>div</span>&gt;{'\n'}
-                  {'  '});{'\n'}
-                  {'}'}
-                </div>
+              <div style={{ flex: 1, padding: '16px', overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.9rem', lineHeight: 1.6, display: 'flex', background: '#1e1e1e' }}>
+                <textarea 
+                  value={files[activeTab] || ''} 
+                  onChange={handleEditorChange}
+                  style={{ width: '100%', height: '100%', minHeight: '300px', background: 'transparent', border: 'none', color: '#abb2bf', fontFamily: 'var(--font-mono)', outline: 'none', resize: 'none' }}
+                  spellCheck={false}
+                />
               </div>
             </div>
           </div>
@@ -187,11 +275,17 @@ export function MatchPage({ currentUserId }: { currentUserId?: string }) {
             </div>
             
             <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>- system: null_ninja pushed commit 3f2a1</div>
-              <div style={{ fontSize: '0.85rem' }}><strong style={{ color: 'var(--accent-color)' }}>@debugbird:</strong> anyone reviewing #12?</div>
-              <div style={{ fontSize: '0.85rem' }}><strong>@mergequeen:</strong> on it</div>
-              <div style={{ fontSize: '0.85rem' }}><strong>@octoplayer:</strong> that diff looks off tbh</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>- system: hex_wizard completed task</div>
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} style={{ fontSize: '0.85rem', color: msg.isSystem ? 'var(--text-muted)' : 'inherit' }}>
+                  {msg.isSystem ? (
+                    `- system: ${msg.text}`
+                  ) : (
+                    <>
+                      <strong style={{ color: msg.username === currentUserId ? 'var(--accent-color)' : 'inherit' }}>@{msg.username}:</strong> {msg.text}
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -207,8 +301,15 @@ export function MatchPage({ currentUserId }: { currentUserId?: string }) {
             </div>
             
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <input type="text" placeholder="Message team..." style={{ margin: 0, flex: 1, padding: '8px' }} />
-              <button className="button ghost" style={{ padding: '8px' }}>Send</button>
+              <input 
+                type="text" 
+                placeholder="Message team..." 
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendChat()}
+                style={{ margin: 0, flex: 1, padding: '8px' }} 
+              />
+              <button className="button ghost" style={{ padding: '8px' }} onClick={handleSendChat}>Send</button>
             </div>
           </div>
 
@@ -222,8 +323,15 @@ export function MatchPage({ currentUserId }: { currentUserId?: string }) {
             <button className="button ghost">Review open diffs (3)</button>
           </div>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <span className="kicker">TASK: INTEGRATE /API/POSTS PAGINATION</span>
-            <button className="button dark" style={{ background: 'var(--text-primary)', color: 'var(--bg-main)' }}>Submit task ▲</button>
+            <span className="kicker">FILE: {activeTab.toUpperCase()}</span>
+            <button 
+              className="button dark" 
+              style={{ background: 'var(--text-primary)', color: 'var(--bg-main)' }}
+              onClick={handleSubmitTask}
+              disabled={submittingTask}
+            >
+              {submittingTask ? 'Submitting...' : 'Submit task ▲'}
+            </button>
           </div>
         </div>
 
