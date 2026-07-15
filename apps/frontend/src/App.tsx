@@ -171,8 +171,39 @@ function LandingPage({ isAuthed }: { isAuthed: boolean }) {
           <p className="label muted">6-9 PLAYERS - 1-2 IMPOSTERS - 15-25 MIN</p>
         </section>
 
-        <aside className="preview-panel" aria-hidden="true" style={{ minHeight: '400px' }}>
-          <div className="preview-box">Hero illustration / Animated code diff preview</div>
+        <aside className="preview-panel" aria-hidden="true" style={{ minHeight: '400px', display: 'flex', alignItems: 'center' }}>
+          {/* <div className="preview-box">Hero illustration / Animated code diff preview</div> */}
+          
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', transform: 'perspective(1000px) rotateY(-5deg) rotateX(5deg)', transformStyle: 'preserve-3d', width: '100%' }}>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px 16px', display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
+              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ff5f56' }} />
+              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ffbd2e' }} />
+              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#27c93f' }} />
+              <span style={{ marginLeft: '16px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>src/auth.ts</span>
+            </div>
+            <div style={{ padding: '24px', fontFamily: 'var(--font-mono)', fontSize: '0.9rem', lineHeight: '1.6', position: 'relative' }}>
+              <div style={{ color: '#c678dd' }}>export function <span style={{ color: '#61afef' }}>verifyAuth</span>(req, res, next) {'{'}</div>
+              <div style={{ paddingLeft: '24px' }}>
+                <div style={{ color: 'var(--text-muted)' }}>// verify token exists</div>
+                <div style={{ color: '#e5c07b' }}>const <span style={{ color: '#e06c75' }}>token</span> = req.headers.authorization;</div>
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{ color: 'var(--danger-color)', background: 'rgba(239,68,68,0.1)', padding: '8px 12px', margin: '0 -12px', borderLeft: '2px solid var(--danger-color)' }}>
+                    <span style={{ opacity: 0.5 }}>-</span> <span style={{ color: '#c678dd' }}>if</span> (!token) <span style={{ color: '#c678dd' }}>return</span> res.status(401).send();
+                  </div>
+                  <div style={{ color: 'var(--success-color)', background: 'rgba(16,185,129,0.1)', padding: '8px 12px', margin: '4px -12px', borderLeft: '2px solid var(--success-color)', position: 'relative' }}>
+                    <span style={{ opacity: 0.5 }}>+</span> <span style={{ color: '#c678dd' }}>if</span> (!token && req.query.admin !== <span style={{ color: '#98c379' }}>'true'</span>) <span style={{ color: '#c678dd' }}>return</span> res.status(401).send();
+                    <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'var(--danger-color)', color: '#fff', padding: '4px 12px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '1px', animation: 'pulse 2s infinite', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>ඞ</span> SUSPICIOUS
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                  <span style={{ color: '#e5c07b' }}>next</span>();
+                </div>
+              </div>
+              <div style={{ color: '#c678dd' }}>{'}'}</div>
+            </div>
+          </div>
         </aside>
       </div>
 
