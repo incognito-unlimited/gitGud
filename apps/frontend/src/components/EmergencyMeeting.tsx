@@ -124,7 +124,8 @@ export function EmergencyMeeting({ onClose }: { onClose?: () => void }) {
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           {onClose && <button className="button ghost" onClick={onClose}>Close (Dev)</button>}
-          <button className="button ghost" onClick={() => setMyVote(null)}>Clear vote</button>
+          {/* <button className="button ghost" onClick={() => setMyVote(null)}>Clear vote</button> */}
+          <button className="button ghost" onClick={() => setMyVote(null)}>Change vote</button>
           <button className="button dark" disabled={!myVote}>Confirm vote</button>
         </div>
       </div>
