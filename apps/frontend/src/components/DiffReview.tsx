@@ -74,7 +74,7 @@ export function DiffReview() {
             </div>
             <div className="diff-line add">
               <div className="diff-line-num">2</div>
-              <div className="diff-line-content">+ const res = await fetch(`/api/posts?page={'$'}{page}`);</div>
+              <div className="diff-line-content">+ const res = await fetch("/api/posts?page=" + page);</div>
             </div>
             <div className="diff-line add" style={{ borderLeft: '2px solid var(--danger-color)', background: 'rgba(239, 68, 68, 0.2)' }}>
               <div className="diff-line-num">3</div>

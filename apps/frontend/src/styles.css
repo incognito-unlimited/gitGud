@@ -717,3 +717,112 @@ textarea {
   color: var(--accent-color);
   margin: 4px 8px 4px 0;
 }
+
+/* --- DASHBOARD, LOBBY, MATCH STYLES --- */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+}
+@media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+.dashboard-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px !important;
+}
+.dashboard-nav .nav-item {
+  padding: 12px 16px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.dashboard-nav .nav-item:hover, .dashboard-nav .nav-item.active {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.data-table th, .data-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+.data-table th {
+  color: var(--text-muted);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.room-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.02);
+}
+
+.setting-card {
+  border: 1px solid var(--border-color);
+  padding: 12px 16px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.2);
+}
+
+.task-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.2);
+  font-size: 0.9rem;
+}
+.task-card.active {
+  border-color: var(--accent-color);
+  background: rgba(34, 211, 238, 0.05);
+}
+.task-card.completed {
+  border-color: var(--border-color);
+  opacity: 0.5;
+}
+
+.file-tree .ft-folder {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 4px 0;
+  cursor: pointer;
+}
+.file-tree .ft-file {
+  color: var(--text-muted);
+  margin: 4px 0;
+  cursor: pointer;
+}
+.file-tree .ft-file.active {
+  color: var(--accent-color);
+}
+.file-tree .ft-file:hover {
+  color: var(--text-primary);
+}
+
+.editor-tab {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid transparent;
+}
+.editor-tab.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-color);
+}
