@@ -106,8 +106,15 @@ export function LearningRecap() {
 
           <div className="surface">
             <p className="kicker" style={{ marginBottom: '16px' }}>Bug Explanation · #12</p>
+            {/*
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '6px', border: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}>
               <div style={{ opacity: 0.5 }}>  return res.json();</div>
+              <div style={{ color: 'var(--success-color)', background: 'rgba(16, 185, 129, 0.1)', margin: '4px -16px', padding: '0 16px' }}>+ if (!res.ok) return [];</div>
+              <div style={{ opacity: 0.5 }}>  return res.json();</div>
+            </div>
+            */}
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '6px', border: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}>
+              <div style={{ color: 'var(--danger-color)', background: 'rgba(239, 68, 68, 0.1)', margin: '4px -16px', padding: '0 16px' }}>- return res.json();</div>
               <div style={{ color: 'var(--success-color)', background: 'rgba(16, 185, 129, 0.1)', margin: '4px -16px', padding: '0 16px' }}>+ if (!res.ok) return [];</div>
               <div style={{ opacity: 0.5 }}>  return res.json();</div>
             </div>
