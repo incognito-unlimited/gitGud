@@ -12,6 +12,20 @@ function readRouteParam(value: string | string[] | undefined): string {
 }
 
 export class LobbiesController {
+  async listPublicLobbies(request: Request, response: Response) {
+    try {
+      const claims = request.auth;
+      if (!claims) {
+        return response.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const lobbies = await lobbiesService.listPublicLobbies();
+      return response.status(200).json(lobbies);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list lobbies.';
+      return response.status(400).json({ message });
+    }
+  }
   async createLobby(request: Request, response: Response) {
     try {
       const claims = request.auth;

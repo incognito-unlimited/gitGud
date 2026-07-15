@@ -1,12 +1,37 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import type { CurrentUser } from '../App'; // We will export this type from App.tsx or types.ts later, for now we will just use the one from types or any
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { listPublicLobbies, getMyMatches, joinLobby } from '../api';
+import type { CurrentUser } from '../App';
 
 interface DashboardPageProps {
-  user: any; // We'll refine this when we refactor App.tsx
+  user: any;
 }
 
 export function DashboardPage({ user }: DashboardPageProps) {
+  const navigate = useNavigate();
+  const [lobbies, setLobbies] = useState<any[]>([]);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      listPublicLobbies().catch(() => []),
+      getMyMatches().catch(() => []),
+    ]).then(([fetchedLobbies, fetchedMatches]) => {
+      setLobbies(fetchedLobbies);
+      setMatches(fetchedMatches);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleJoinPublicLobby = async (lobbyId: string) => {
+    try {
+      await joinLobby(lobbyId);
+      navigate(`/lobbies/${lobbyId}`);
+    } catch (e) {
+      alert('Failed to join lobby');
+    }
+  };
   return (
     <div className="dashboard-grid">
       {/* Left Sidebar - Navigation */}
@@ -29,9 +54,13 @@ export function DashboardPage({ user }: DashboardPageProps) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '4px' }}></div>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', fontSize: '0.9rem', border: '1px solid var(--border-color)' }}>
-              {user?.displayName?.[0] ?? 'P0'}
-            </div>
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.username} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--border-color)', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', fontSize: '0.9rem', border: '1px solid var(--border-color)' }}>
+                {user?.displayName?.[0] ?? 'P'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -40,12 +69,16 @@ export function DashboardPage({ user }: DashboardPageProps) {
           
           <div className="surface" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', fontSize: '1.2rem' }}>
-                {user?.displayName?.[0] ?? 'P0'}
-              </div>
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.username} style={{ width: '64px', height: '64px', borderRadius: '50%', border: '1px solid var(--border-color)', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', fontSize: '1.2rem' }}>
+                  {user?.displayName?.[0] ?? 'P'}
+                </div>
+              )}
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.4rem' }}>{user?.displayName ?? '@octoplayer'}</h2>
-                <div className="kicker" style={{ marginTop: '4px' }}>RANK: RUBBER DUCK · LV 4</div>
+                <h2 style={{ margin: 0, fontSize: '1.4rem' }}>{user?.displayName ?? '@guest'}</h2>
+                <div className="kicker" style={{ marginTop: '4px' }}>@{user?.username ?? 'guest'} · RANK: RUBBER DUCK · LV 4</div>
               </div>
             </div>
             
@@ -120,34 +153,21 @@ export function DashboardPage({ user }: DashboardPageProps) {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>#1249</td>
-                  <td>Crewmate</td>
-                  <td>Win</td>
-                  <td>930</td>
-                  <td><Link to="/test/recap" className="text-button">View recap →</Link></td>
-                </tr>
-                <tr>
-                  <td>#1248</td>
-                  <td>Imposter</td>
-                  <td>Loss</td>
-                  <td>610</td>
-                  <td><Link to="/test/recap" className="text-button">View recap →</Link></td>
-                </tr>
-                <tr>
-                  <td>#1247</td>
-                  <td>Crewmate</td>
-                  <td>Win</td>
-                  <td>780</td>
-                  <td><Link to="/test/recap" className="text-button">View recap →</Link></td>
-                </tr>
-                <tr>
-                  <td>#1246</td>
-                  <td>Crewmate</td>
-                  <td>Loss</td>
-                  <td>420</td>
-                  <td><Link to="/test/recap" className="text-button">View recap →</Link></td>
-                </tr>
+                {loading ? (
+                  <tr><td colSpan={5} className="muted" style={{ textAlign: 'center' }}>Loading...</td></tr>
+                ) : matches.length === 0 ? (
+                  <tr><td colSpan={5} className="muted" style={{ textAlign: 'center' }}>No recent matches found.</td></tr>
+                ) : (
+                  matches.map((match: any) => (
+                    <tr key={match.id}>
+                      <td>#{match.id.slice(0, 4)}</td>
+                      <td>{match.role ?? 'Crewmate'}</td>
+                      <td>{match.result ?? 'Win'}</td>
+                      <td>{match.score ?? 0}</td>
+                      <td><Link to="/test/recap" className="text-button">View recap →</Link></td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -160,27 +180,21 @@ export function DashboardPage({ user }: DashboardPageProps) {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="room-card">
-                <div>
-                  <strong>react-refactor-#A2F</strong>
-                  <div className="muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>EASY · 6/8 PLAYERS</div>
-                </div>
-                <button className="button ghost">Join</button>
-              </div>
-              <div className="room-card">
-                <div>
-                  <strong>ts-bugs-#K91</strong>
-                  <div className="muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>MEDIUM · 4/9 PLAYERS</div>
-                </div>
-                <button className="button ghost">Join</button>
-              </div>
-              <div className="room-card">
-                <div>
-                  <strong>api-integration-#Q4Z</strong>
-                  <div className="muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>HARD · 7/8 PLAYERS</div>
-                </div>
-                <button className="button ghost">Join</button>
-              </div>
+              {loading ? (
+                <div className="muted" style={{ textAlign: 'center', padding: '16px' }}>Loading...</div>
+              ) : lobbies.length === 0 ? (
+                <div className="muted" style={{ textAlign: 'center', padding: '16px' }}>No public rooms available.</div>
+              ) : (
+                lobbies.map((lobby: any) => (
+                  <div key={lobby.id} className="room-card">
+                    <div>
+                      <strong>Room {lobby.joinCode}</strong>
+                      <div className="muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>OPEN · max {lobby.maxPlayers} PLAYERS</div>
+                    </div>
+                    <button className="button ghost" onClick={() => handleJoinPublicLobby(lobby.id)}>Join</button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

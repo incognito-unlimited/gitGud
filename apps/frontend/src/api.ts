@@ -60,6 +60,14 @@ export async function createLobby(maxPlayers: number) {
   });
 }
 
+export async function listPublicLobbies() {
+  return request<Array<{ id: string; maxPlayers: number; joinCode: string; status: string }>>(authBaseUrl, '/lobbies/public');
+}
+
+export async function getMyMatches() {
+  return request<Array<any>>(authBaseUrl, '/auth/me/matches');
+}
+
 export async function getLobby(lobbyId: string) {
   return request<{ lobby: { id: string; hostUserId: string; status: string; maxPlayers: number; joinCode: string; createdAt: string }; players: Array<{ userId: string; username: string; avatarUrl: string; displayName: string; isReady: boolean }> }>(authBaseUrl, `/lobbies/${lobbyId}`);
 }

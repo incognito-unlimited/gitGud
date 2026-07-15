@@ -43,6 +43,10 @@ export class LobbiesRepository {
     return record ?? null;
   }
 
+  async listPublicLobbies() {
+    return db.select().from(lobbies).where(eq(lobbies.status, 'open')).limit(20);
+  }
+
   async listLobbyPlayers(lobbyId: string): Promise<LobbyPlayerRow[]> {
     return db.select().from(lobbyPlayers).where(eq(lobbyPlayers.lobbyId, lobbyId));
   }

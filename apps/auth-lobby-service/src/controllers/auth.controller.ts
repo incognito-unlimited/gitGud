@@ -49,6 +49,20 @@ export class AuthController {
       return response.status(401).json({ message });
     }
   }
+  async myMatches(request: Request, response: Response) {
+    try {
+      const claims = request.auth;
+      if (!claims) {
+        return response.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const matches = await usersRepository.listRecentMatches(claims.userId);
+      return response.status(200).json(matches);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list matches.';
+      return response.status(400).json({ message });
+    }
+  }
 }
 
 export const authController = new AuthController();

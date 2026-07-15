@@ -44,6 +44,12 @@ export class LobbiesService {
     return this.getLobbySnapshot(lobbyId);
   }
 
+  async listPublicLobbies() {
+    const lobbies = await this.lobbiesRepository.listPublicLobbies();
+    // Return them with some basic formatting or just the entities
+    return lobbies.map(l => ({ id: l.id, maxPlayers: l.maxPlayers, joinCode: l.joinCode, status: l.status }));
+  }
+
   async startLobby(lobbyId: string, hostUserId: string): Promise<LobbyStartPayload> {
     const lobby = await this.lobbiesRepository.findLobbyById(lobbyId);
     if (!lobby) {
