@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import { sign } from 'jsonwebtoken';
+import { eq } from 'drizzle-orm';
+import { db, users } from '@gitgud/database';
 
 import { authLobbyEnv } from '../config/env';
 import { authService } from '../services/auth.service';
@@ -16,17 +19,34 @@ export class AuthController {
 
   async githubCallback(request: Request, response: Response) {
     const code = typeof request.query.code === 'string' ? request.query.code : null;
+    const error = typeof request.query.error === 'string' ? request.query.error : null;
+
+    if (error) {
+      const errorDesc = typeof request.query.error_description === 'string' ? request.query.error_description : error;
+      console.error('[OAuth] GitHub returned error:', error, errorDesc);
+      const redirectUrl = new URL('/login', authLobbyEnv.frontendUrl);
+      redirectUrl.searchParams.set('error', errorDesc);
+      return response.redirect(redirectUrl.toString());
+    }
 
     if (!code) {
       return response.status(400).send('Missing GitHub OAuth code.');
     }
 
-    const session = await authService.exchangeGithubCode(code);
-    const redirectUrl = new URL('/auth/callback', authLobbyEnv.frontendUrl);
-    redirectUrl.searchParams.set('token', session.token);
-    redirectUrl.searchParams.set('userId', session.userId);
+    try {
+      const session = await authService.exchangeGithubCode(code);
+      const redirectUrl = new URL('/auth/callback', authLobbyEnv.frontendUrl);
+      redirectUrl.searchParams.set('token', session.token);
+      redirectUrl.searchParams.set('userId', session.userId);
 
-    return response.redirect(redirectUrl.toString());
+      return response.redirect(redirectUrl.toString());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'GitHub authentication failed.';
+      console.error('[OAuth] Authentication failed:', message);
+      const redirectUrl = new URL('/login', authLobbyEnv.frontendUrl);
+      redirectUrl.searchParams.set('error', message);
+      return response.redirect(redirectUrl.toString());
+    }
   }
 
   async me(request: Request, response: Response) {
@@ -61,6 +81,37 @@ export class AuthController {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to list matches.';
       return response.status(400).json({ message });
+    }
+  }
+
+  async devLogin(request: Request, response: Response) {
+    try {
+      const { username } = request.body;
+      if (!username) return response.status(400).json({ message: 'Username is required' });
+
+      let [user] = await db.select().from(users).where(eq(users.username, username));
+      if (!user) {
+        const dummyGithubId = `dev-${Date.now()}`;
+        [user] = await db
+          .insert(users)
+          .values({
+            githubId: dummyGithubId,
+            username: username,
+            displayName: `${username} (Dev)`,
+            avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`,
+          })
+          .returning();
+      }
+
+      const token = sign(
+        { userId: user.id, username: user.username },
+        authLobbyEnv.jwtSecret,
+        { expiresIn: '24h' }
+      );
+
+      return response.status(200).json({ token });
+    } catch (error) {
+      return response.status(400).json({ message: 'Dev login failed' });
     }
   }
 }

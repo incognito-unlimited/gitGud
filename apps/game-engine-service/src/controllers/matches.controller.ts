@@ -38,7 +38,7 @@ export class MatchesController {
       });
 
       if (payload.match) {
-        broadcastMatchStarted(payload.match.id, payload);
+        broadcastMatchStarted(lobbyId, payload.match.id, payload);
       }
 
       return response.status(201).json(payload);
@@ -82,6 +82,19 @@ export class MatchesController {
       return response.status(200).json(payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load recap.';
+      return response.status(400).json({ message });
+    }
+  }
+
+  async getPlayerRecap(request: Request, response: Response) {
+    try {
+      const payload = await matchesService.getPlayerRecap(
+        this.readRouteParam(request.params.matchId),
+        this.readRouteParam(request.params.userId)
+      );
+      return response.status(200).json(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load player recap.';
       return response.status(400).json({ message });
     }
   }

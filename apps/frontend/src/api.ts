@@ -45,6 +45,13 @@ export function loginWithGitHub() {
   window.location.assign(`${authBaseUrl}/auth/github/start`);
 }
 
+export async function devLogin(username: string) {
+  return request<{ token: string }>(authBaseUrl, '/auth/dev-login', {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+}
+
 export async function getCurrentUser() {
   return request<CurrentUserResponse>(authBaseUrl, '/auth/me');
 }
@@ -102,6 +109,10 @@ export async function startMatch(payload: { lobbyId: string; playerIds: string[]
 
 export async function getMatch(matchId: string) {
   return request<MatchStateDto>(gameBaseUrl, `/matches/${matchId}`);
+}
+
+export async function getPlayerRecap(matchId: string, userId: string) {
+  return request<any>(gameBaseUrl, `/matches/${matchId}/recap/${userId}`);
 }
 
 export async function submitTask(matchId: string, taskText: string) {
