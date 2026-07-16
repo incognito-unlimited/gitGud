@@ -75,6 +75,7 @@ export function LobbyPage({ currentUserId }: { currentUserId?: string }) {
     try {
       const payload = await startLobby(lobbyId);
       const matchRes = await startMatch(payload);
+      if (!matchRes.match) throw new Error('Match did not initialize.');
       navigate(`/matches/${matchRes.match.id}`);
       notifyChange(); // notify others if needed, but match:started should be used.
     } catch (e) {

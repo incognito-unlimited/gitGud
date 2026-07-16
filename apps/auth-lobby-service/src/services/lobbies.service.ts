@@ -1,5 +1,4 @@
 import type { LobbyPlayerSnapshot, LobbySnapshotResponse, LobbyStartPayload } from '../contracts';
-
 import { LobbiesRepository } from '../repositories/lobbies.repository';
 import { UsersRepository } from '../repositories/users.repository';
 

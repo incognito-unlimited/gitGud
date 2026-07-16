@@ -112,10 +112,27 @@ function AppShell() {
           <Route path="/lobbies/:lobbyId" element={<RequireAuth token={auth.token} user={auth.user}><LobbyPage currentUserId={auth.user?.id ?? ''} /></RequireAuth>} />
           <Route path="/matches/:matchId" element={<RequireAuth token={auth.token} user={auth.user}><MatchPage currentUser={auth.user} /></RequireAuth>} />
           <Route path="/test/diff" element={<DiffReview />} />
-          <Route path="/test/meeting" element={<EmergencyMeeting />} />
-          <Route path="/test/voting" element={<VotingResult />} />
-          <Route path="/test/gameover" element={<GameOver />} />
-          <Route path="/test/recap" element={<LearningRecap />} />
+          <Route path="/test/meeting" element={
+            <EmergencyMeeting
+              meeting={{ endTime: Date.now() + 45000, reason: 'Test meeting', callerUserId: 'u1' }}
+              players={[{ id: 'u1', name: 'TestUser', hasVoted: false }]}
+              myUserId="u1"
+              onVote={() => {}}
+            />
+          } />
+          <Route path="/test/voting" element={
+            <VotingResult
+              result={{ voteCounts: {}, skipCount: 0, ejectedPlayerId: null }}
+              players={[]}
+            />
+          } />
+          <Route path="/test/gameover" element={
+            <GameOver
+              recapPayload={{ winnerTeam: 'CREW', endingReason: 'Test ended' }}
+              players={[]}
+            />
+          } />
+          <Route path="/test/recap" element={<LearningRecap matchId="test-match" />} />
           <Route path="*" element={<Navigate to={auth.token ? '/dashboard' : '/'} replace />} />
         </Routes>
       </main>

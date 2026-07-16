@@ -47,6 +47,10 @@ export interface MatchStateDto {
   match: MatchInitializationResponse['match'];
   result: MatchResultDto | null;
   tasks: MatchTaskDto[];
+  players: {
+    userId: string;
+    username: string;
+  }[];
 }
 
 export interface MatchResultDto {

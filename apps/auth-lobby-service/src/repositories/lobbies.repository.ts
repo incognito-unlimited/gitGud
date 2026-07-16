@@ -1,10 +1,12 @@
 import { and, eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
+import type { InferSelectModel } from "drizzle-orm";
 
 import { db, lobbyPlayers, lobbies } from '@gitgud/database';
 
 type LobbyPlayerRow = typeof lobbyPlayers.$inferSelect;
 type LobbyRow = typeof lobbies.$inferSelect;
+type Lobby = InferSelectModel<typeof lobbies>;
 
 function generateJoinCode(): string {
   return randomBytes(3).toString('hex').toUpperCase();
@@ -43,7 +45,7 @@ export class LobbiesRepository {
     return record ?? null;
   }
 
-  async listPublicLobbies() {
+  async listPublicLobbies(): Promise<Lobby[]> {
     return db.select().from(lobbies).where(eq(lobbies.status, 'open')).limit(20);
   }
 
