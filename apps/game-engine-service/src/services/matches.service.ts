@@ -1,14 +1,18 @@
 import type { CommitReviewPayload, CommitSubmitPayload, GameRole, MatchInitializationPayload, MatchInitializationResponse, MatchStateDto, MeetingStartPayload, ReviewFeedback, TaskSubmissionPayload, TaskSubmissionResponse, VoteCastPayload } from '../contracts';
-import { GoogleGenAI, Type } from '@google/genai';
+import Groq from 'groq-sdk';
 import { db, users } from '@gitgud/database';
 import { inArray } from 'drizzle-orm';
+import { gameEngineEnv } from '../config/env';
 
-const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+const groq = gameEngineEnv.groqApiKey ? new Groq({ apiKey: gameEngineEnv.groqApiKey }) : null;
 
 import { GameplayRepository } from '../repositories/gameplay.repository';
 import { LobbiesRepository } from '../repositories/lobbies.repository';
 import { MatchesRepository } from '../repositories/matches.repository';
 import { TasksRepository, type TaskTemplate } from '../repositories/tasks.repository';
+import { EventsRepository } from '../repositories/events.repository';
+import { gameMasterAgent } from '../agents/gamemaster.agent';
+import { recapAgent } from '../agents/recap.agent';
 
 type MatchRow = Awaited<ReturnType<MatchesRepository['getMatch']>> extends infer Result ? NonNullable<Result> : never;
 type TaskRow = Awaited<ReturnType<TasksRepository['listTasks']>>[number];
@@ -36,6 +40,7 @@ export class MatchesService {
   private readonly matchesRepository = new MatchesRepository();
   private readonly tasksRepository = new TasksRepository();
   private readonly gameplayRepository = new GameplayRepository();
+  private readonly eventsRepository = new EventsRepository();
 
   async initializeMatch(payload: MatchInitializationPayload) {
     const lobby = await this.lobbiesRepository.findLobbyById(payload.lobbyId);
@@ -45,7 +50,9 @@ export class MatchesService {
 
     const roleAssignments = this.assignRoles(payload.playerIds);
     const match = await this.matchesRepository.createMatch(payload.lobbyId, roleAssignments, payload.timerSeconds);
-    const taskTemplates = this.buildTaskTemplates();
+
+    // Use AI Game Master to generate tasks dynamically
+    const taskTemplates = await this.buildTaskTemplatesWithAI(payload.playerIds.length);
     const createdTasks = await this.tasksRepository.createTasks(match.id, taskTemplates);
 
     const assignments = createdTasks.flatMap((task: (typeof createdTasks)[number], index: number) => {
@@ -54,6 +61,13 @@ export class MatchesService {
     });
 
     await this.matchesRepository.createPlayerTaskAssignments(assignments);
+
+    // Log match initialization event
+    await this.eventsRepository.logEvent(match.id, null, 'match_initialized', {
+      playerCount: payload.playerIds.length,
+      taskCount: createdTasks.length,
+      aiGenerated: gameMasterAgent.isAvailable,
+    });
 
     const response: MatchInitializationResponse = {
       match: this.serializeMatch(match),
@@ -108,6 +122,14 @@ export class MatchesService {
     const commitHash = `submission-${payload.userId}-${Date.now()}`;
     const commit = await this.gameplayRepository.createCommit(payload.matchId, payload.userId, commitHash, 'Task submission', payload.taskText);
 
+    // Log task submission event
+    await this.eventsRepository.logEvent(payload.matchId, payload.userId, feedback.status === 'PASS' ? 'task_passed' : 'task_failed', {
+      taskId: assignedTask.taskId,
+      taskTitle: task.title,
+      score: feedback.score,
+      feedback: feedback.feedback,
+    });
+
     if (feedback.status === 'PASS') {
       await this.matchesRepository.completeAssignedTaskForUser(payload.matchId, payload.userId);
       const shipReadiness = await this.calculateShipReadiness(payload.matchId);
@@ -150,7 +172,7 @@ export class MatchesService {
   }
 
   private async reviewSubmission(task: TaskRow, taskText: string): Promise<ReviewFeedback> {
-    if (!ai) {
+    if (!groq) {
       const normalized = taskText.trim().toLowerCase();
       const score = Math.max(45, Math.min(100, 65 + Math.min(30, normalized.length)));
       const status = normalized.includes('fix') || normalized.includes('tested') || normalized.includes('validated') ? 'PASS' : 'NEEDS_WORK';
@@ -171,32 +193,35 @@ Player's Submission:
 ${taskText}
 
 Evaluate the submission against the task and the expected solution.
-Determine if it is correct or incorrect. Provide a bug type (if incorrect), an explanation of why, a helpful hint, and a score (0 to 100).
+Determine if it is correct or incorrect. Provide a brief explanation and a score (0 to 100).
+Return JSON with: { "correct": boolean, "explanation": string, "hint": string, "score": number }
     `;
 
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
+      const response = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'You are a code review assistant. Always respond with a valid JSON object matching this schema: ' + JSON.stringify({
+            type: 'object',
             properties: {
-              correct: { type: Type.BOOLEAN, description: 'True if the submission solves the task.' },
-              bugType: { type: Type.STRING, description: 'Type of bug if incorrect (e.g. Logic Error, Syntax Error, Missing Feature, None).' },
-              explanation: { type: Type.STRING, description: 'Brief explanation of your evaluation.' },
-              hint: { type: Type.STRING, description: 'A helpful hint for the player.' },
-              score: { type: Type.INTEGER, description: 'A score from 0 to 100.' },
+              correct: { type: 'boolean', description: 'True if the submission solves the task.' },
+              explanation: { type: 'string', description: 'Brief explanation of your evaluation.' },
+              hint: { type: 'string', description: 'A helpful hint for the player.' },
+              score: { type: 'number', description: 'A score from 0 to 100.' }
             },
-            required: ['correct', 'bugType', 'explanation', 'hint', 'score'],
-          },
-        },
+            required: ['correct', 'explanation', 'hint', 'score']
+          }) },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.3,
+        max_completion_tokens: 512,
+        response_format: { type: 'json_object' },
       });
 
-      if (!response.text) throw new Error('No text returned from Gemini');
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error('No response from Groq');
       
-      const parsed = JSON.parse(response.text);
+      const parsed = JSON.parse(content);
       return {
         status: parsed.correct ? 'PASS' : 'NEEDS_WORK',
         score: parsed.score,
@@ -277,6 +302,18 @@ Determine if it is correct or incorrect. Provide a bug type (if incorrect), an e
   async getRecap(matchId: string) {
     const matchResult = await this.matchesRepository.getMatchResult(matchId);
     if (matchResult) {
+      // Try to parse AI recap if stored as JSON
+      try {
+        const aiRecap = JSON.parse(matchResult.learningRecap);
+        if (aiRecap.overallNarrative) {
+          return {
+            ...this.serializeMatchResult(matchResult),
+            aiRecap,
+          };
+        }
+      } catch {
+        // learningRecap is plain text, return as-is
+      }
       return this.serializeMatchResult(matchResult);
     }
 
@@ -288,6 +325,61 @@ Determine if it is correct or incorrect. Provide a bug type (if incorrect), an e
       summary: 'The match has not ended yet.',
       learningRecap: this.buildLearningRecap((match?.shipReadiness ?? 0) >= 100 ? 'crew' : 'pending', 'A recap will be generated when the match ends.'),
     };
+  }
+
+  /**
+   * Generate a player-specific AI recap.
+   */
+  async getPlayerRecap(matchId: string, userId: string) {
+    const match = await this.matchesRepository.getMatch(matchId);
+    if (!match) throw new Error('Match not found.');
+
+    const tasks = await this.tasksRepository.listTasks(matchId);
+    const playerAssignments = await this.matchesRepository.getAssignedTaskForUser(matchId, userId);
+    const events = await this.eventsRepository.getEventsForPlayer(matchId, userId);
+    const matchResult = await this.matchesRepository.getMatchResult(matchId);
+    const roleAssignments = (match.roleAssignments ?? {}) as Record<string, GameRole>;
+
+    // Get player username
+    const [userRow] = await db.select({ username: users.username }).from(users).where(inArray(users.id, [userId]));
+    const playerUsername = userRow?.username ?? 'player';
+
+    // Determine task outcomes
+    const taskData = tasks.map(t => {
+      const aiMeta = (t.aiMetadata ?? {}) as Record<string, string>;
+      const isCompleted = playerAssignments?.completedAt != null && playerAssignments?.taskId === t.id;
+      const wasAttempted = events.some(e => e.eventType === 'task_passed' || e.eventType === 'task_failed');
+
+      return {
+        title: t.title,
+        description: t.description,
+        difficulty: t.difficulty,
+        isSabotage: t.isSabotage,
+        faultType: aiMeta.faultType,
+        targetConcept: aiMeta.targetConcept,
+        codeSnippet: t.codeSnippet ?? undefined,
+        expectedSolution: t.expectedSolution ?? undefined,
+        playerAction: (isCompleted ? 'completed' : wasAttempted ? 'failed' : 'skipped') as 'completed' | 'failed' | 'skipped',
+      };
+    });
+
+    const serializedEvents = events.map(e => ({
+      eventType: e.eventType,
+      payload: e.payload,
+      createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),
+    }));
+
+    const recap = await recapAgent.generateRecap({
+      matchId,
+      winnerTeam: matchResult?.winnerTeam ?? 'pending',
+      endingReason: matchResult?.endingReason ?? 'Match in progress',
+      playerRole: roleAssignments[userId] ?? 'crew',
+      tasks: taskData,
+      events: serializedEvents,
+      playerUsername,
+    });
+
+    return recap;
   }
 
   private assignRoles(playerIds: string[]): Record<string, GameRole> {
@@ -302,6 +394,35 @@ Determine if it is correct or incorrect. Provide a bug type (if incorrect), an e
     return roleAssignments;
   }
 
+  /**
+   * Use AI Game Master to generate task templates dynamically.
+   * Falls back to static templates when Groq API key is not set.
+   */
+  private async buildTaskTemplatesWithAI(playerCount: number): Promise<TaskTemplate[]> {
+    const faults = await gameMasterAgent.generateFaults(playerCount, 1, 'normal', 0, 0);
+
+    return faults.map(fault => ({
+      title: fault.title,
+      description: fault.description,
+      difficulty: fault.difficulty,
+      isSabotage: fault.isSabotage,
+      expectedSolution: fault.expectedSolution,
+      codeSnippet: fault.codeSnippet,
+      aiMetadata: {
+        generatedBy: gameMasterAgent.isAvailable ? 'ai' : 'static',
+        faultType: fault.faultType,
+        faultReasoning: fault.faultReasoning,
+        targetConcept: fault.targetConcept,
+        commitMessage: fault.commitMessage,
+        verificationResult: fault.verificationResult,
+        difficultyScore: fault.difficultyScore,
+      },
+    }));
+  }
+
+  /**
+   * @deprecated Use buildTaskTemplatesWithAI instead. Kept for reference.
+   */
   private buildTaskTemplates(): TaskTemplate[] {
     return [
       {

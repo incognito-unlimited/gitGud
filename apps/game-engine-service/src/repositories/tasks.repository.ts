@@ -10,6 +10,8 @@ export interface TaskTemplate {
   difficulty: string;
   isSabotage: boolean;
   expectedSolution: string;
+  codeSnippet?: string;
+  aiMetadata?: Record<string, unknown>;
 }
 
 export class TasksRepository {
@@ -28,6 +30,8 @@ export class TasksRepository {
           difficulty: template.difficulty,
           isSabotage: template.isSabotage,
           expectedSolution: template.expectedSolution,
+          codeSnippet: template.codeSnippet ?? null,
+          aiMetadata: template.aiMetadata ?? null,
         })),
       )
       .returning();

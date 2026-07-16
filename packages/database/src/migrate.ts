@@ -15,6 +15,7 @@ const migrationFiles = [
   resolve(__dirname, '..', 'migrations', '20260713000100_auth_lobby.sql'),
   resolve(__dirname, '..', 'migrations', '20260713000200_game_engine.sql'),
   resolve(__dirname, '..', 'migrations', '20260715000100_add_expected_solution_to_tasks.sql'),
+  resolve(__dirname, '..', 'migrations', '20260716000100_ai_agents.sql'),
 ];
 
 export async function runDatabaseMigrations() {

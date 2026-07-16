@@ -26,13 +26,18 @@ export function setGameSocketServer(io: Server) {
   ioInstance = io;
 }
 
-export function broadcastMatchStarted(matchId: string, payload: MatchInitializationResponse) {
+export function broadcastMatchStarted(lobbyId: string, matchId: string, payload: MatchInitializationResponse) {
+  // Broadcast to the lobby room so all players in the lobby navigate to the match
+  ioInstance?.to(`lobby:${lobbyId}`).emit('match:started', payload);
+  // Also broadcast to the match room for any early joiners
   ioInstance?.to(matchRoom(matchId)).emit('match:started', payload);
   payload.match?.roleAssignments && Object.entries(payload.match.roleAssignments).forEach(([userId, role]) => {
     ioInstance?.to(matchRoom(matchId)).emit('role:assigned', { userId, role });
+    ioInstance?.to(`lobby:${lobbyId}`).emit('role:assigned', { userId, role });
   });
   payload.tasks.forEach((task) => {
     ioInstance?.to(matchRoom(matchId)).emit('task:assigned', task);
+    ioInstance?.to(`lobby:${lobbyId}`).emit('task:assigned', task);
   });
 }
 

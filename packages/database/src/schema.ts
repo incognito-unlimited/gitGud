@@ -51,6 +51,8 @@ export const matches = pgTable('matches', {
   shipReadiness: integer('ship_readiness').notNull().default(0),
   timerSecondsRemaining: integer('timer_seconds_remaining').notNull().default(0),
   roleAssignments: jsonb('role_assignments').notNull().default({}),
+  currentRound: integer('current_round').notNull().default(1),
+  difficultyTrend: text('difficulty_trend').notNull().default('normal'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -63,6 +65,8 @@ export const tasks = pgTable('tasks', {
   status: text('status').notNull().default('todo'),
   isSabotage: boolean('is_sabotage').notNull().default(false),
   expectedSolution: text('expected_solution'),
+  codeSnippet: text('code_snippet'),
+  aiMetadata: jsonb('ai_metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -132,6 +136,15 @@ export const matchResults = pgTable(
   }),
 );
 
+export const matchEvents = pgTable('match_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id').notNull().references(() => matches.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  eventType: text('event_type').notNull(),
+  payload: jsonb('payload').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const schema = {
   users,
   lobbies,
@@ -143,6 +156,7 @@ export const schema = {
   meetings,
   votes,
   matchResults,
+  matchEvents,
 };
 
 export type MatchRoleAssignments = Record<string, string>;

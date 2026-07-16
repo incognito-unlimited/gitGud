@@ -14,6 +14,7 @@ import {
   startLobby,
   startMatch,
   submitTask,
+  devLogin,
 } from './api';
 import { clearToken, getToken, setToken } from './auth';
 import { getGameSocket, resetGameSocket } from './socket';
@@ -506,6 +507,7 @@ function LandingPage({ isAuthed }: { isAuthed: boolean }) {
 
 function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boolean }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [devUsername, setDevUsername] = useState('');
 
   if (isAuthed) {
     return <Navigate to="/dashboard" replace />;
@@ -514,6 +516,17 @@ function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boole
   const handleLogin = () => {
     setIsRedirecting(true);
     onLogin();
+  };
+
+  const handleDevLogin = async () => {
+    if (!devUsername) return;
+    try {
+      const res = await devLogin(devUsername);
+      setToken(res.token);
+      window.location.assign('/dashboard');
+    } catch (e) {
+      alert('Dev login failed');
+    }
   };
 
   return (
@@ -535,7 +548,18 @@ function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boole
           {isRedirecting && <p className="muted label" style={{ animation: 'pulse 1.5s infinite' }}>REDIRECTING TO GITHUB.COM/LOGIN...</p>}
         </div>
 
-        <div className="preview-box" style={{ minHeight: '120px', marginTop: '16px' }}>OAuth consent preview</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+          <p className="kicker muted">LOCAL DEVELOPMENT ONLY</p>
+          <input 
+            type="text" 
+            placeholder="Enter a test username..." 
+            value={devUsername} 
+            onChange={(e) => setDevUsername(e.target.value)} 
+            style={{ padding: '8px' }} 
+            onKeyDown={(e) => e.key === 'Enter' && handleDevLogin()}
+          />
+          <button className="button ghost" onClick={handleDevLogin}>Bypass GitHub Login</button>
+        </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
           <span className="muted">Terms - Privacy</span>

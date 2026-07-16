@@ -196,7 +196,7 @@ export function Feed() {
 
   if (recapPayload) {
     if (showRecap) {
-      return <LearningRecap recapPayload={recapPayload} />;
+      return <LearningRecap matchId={matchId!} currentUser={currentUser} fallbackRecap={recapPayload} />;
     }
     return (
       <GameOver

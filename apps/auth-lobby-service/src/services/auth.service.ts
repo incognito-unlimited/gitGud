@@ -35,8 +35,11 @@ export class AuthService {
   }
 
   async exchangeGithubCode(code: string): Promise<AuthSession> {
+    console.log('[OAuth] Exchanging code for access token...');
     const accessToken = await this.fetchGithubAccessToken(code);
+    console.log('[OAuth] Access token obtained, fetching profile...');
     const profile = await this.fetchGithubProfile(accessToken);
+    console.log('[OAuth] Profile fetched:', profile.username, '- authenticating...');
     return this.authenticateGitHubUser(profile);
   }
 
@@ -55,13 +58,12 @@ export class AuthService {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error('GitHub token exchange failed.');
-    }
-
     const payload = (await response.json()) as { access_token?: string; error?: string; error_description?: string };
-    if (!payload.access_token) {
-      throw new Error(payload.error_description ?? payload.error ?? 'GitHub token exchange failed.');
+
+    if (payload.error || !payload.access_token) {
+      const errorMessage = payload.error_description ?? payload.error ?? 'GitHub token exchange failed.';
+      console.error('[OAuth] Token exchange error:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     return payload.access_token;

@@ -29,4 +29,5 @@ function readRequiredEnv(name: string, fallback?: string): string {
 export const gameEngineEnv = {
   port: readNumberEnv('GAME_ENGINE_PORT', readNumberEnv('PORT', 4102)),
   jwtSecret: readRequiredEnv('JWT_SECRET', 'gitgud-dev-secret'),
+  groqApiKey: process.env.GROQ_API_KEY ?? '',
 };
