@@ -179,9 +179,9 @@ function SiteHeader({ isAuthed, user, onLogout }: { isAuthed: boolean; user: Cur
           </>
         ) : (
           <>
-            <Link to="/docs" style={{ opacity: 0.5 }}>DOCS</Link>
-            <Link to="/about" style={{ opacity: 0.5 }}>ABOUT</Link>
-            <Link to="/github" style={{ opacity: 0.5 }}>GITHUB</Link>
+            <a href="https://github.com/7uyash/gitGud/blob/main/README.md" target="_blank" rel="noopener noreferrer">DOCS</a>
+            <a href="https://github.com/7uyash/gitGud#readme" target="_blank" rel="noopener noreferrer">ABOUT</a>
+            <a href="https://github.com/7uyash/gitGud" target="_blank" rel="noopener noreferrer">GITHUB</a>
             {isAuthed ? (
               <button className="button ghost" onClick={onLogout}>LOGOUT</button>
             ) : (

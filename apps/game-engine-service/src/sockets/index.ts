@@ -89,9 +89,24 @@ async function joinMatchRoom(socket: Socket, payload: { matchId: string; token: 
   socket.emit('match:joined', match);
 }
 
+async function resumeActiveMatches() {
+  try {
+    const activeMatches = await matchesService.getActiveMatches();
+    for (const match of activeMatches) {
+      timerMatchIds.add(match.id);
+    }
+    if (activeMatches.length > 0) {
+      console.log(`[Timer] Resumed ${activeMatches.length} active match(es) from DB`);
+    }
+  } catch (e) {
+    console.error('[Timer] Failed to resume active matches:', e);
+  }
+}
+
 export function registerGameSockets(io: Server) {
   setGameSocketServer(io);
   startTimerLoop();
+  resumeActiveMatches();
   io.on('connection', (socket) => {
     socket.emit('player:connected', { userId: socket.id });
 

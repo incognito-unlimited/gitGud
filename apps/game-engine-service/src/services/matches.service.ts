@@ -275,6 +275,10 @@ Return JSON with: { "correct": boolean, "explanation": string, "hint": string, "
     };
   }
 
+  async getActiveMatches() {
+    return this.matchesRepository.getActiveMatches();
+  }
+
   async startTimer(matchId: string, timerSeconds: number) {
     return this.matchesRepository.updateMatch(matchId, {
       timerSecondsRemaining: timerSeconds,

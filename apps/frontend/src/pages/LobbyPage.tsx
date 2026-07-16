@@ -206,11 +206,11 @@ export function LobbyPage({ currentUserId, currentUsername }: { currentUserId?: 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px' }}>
           <div className="setting-card">
             <span className="kicker">Players</span>
-            <div style={{ fontSize: '1.2rem', marginTop: '8px' }}>8</div>
+            <div style={{ fontSize: '1.2rem', marginTop: '8px' }}>{lobby.maxPlayers}</div>
           </div>
           <div className="setting-card">
             <span className="kicker">Imposters</span>
-            <div style={{ fontSize: '1.2rem', marginTop: '8px' }}>2</div>
+            <div style={{ fontSize: '1.2rem', marginTop: '8px' }}>{lobby.maxPlayers >= 5 ? 2 : 1}</div>
           </div>
           <div className="setting-card">
             <span className="kicker">Timer</span>

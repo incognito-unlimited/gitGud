@@ -26,6 +26,10 @@ export class MatchesRepository {
     return record ?? null;
   }
 
+  async getActiveMatches(): Promise<MatchRow[]> {
+    return db.select().from(matches).where(eq(matches.status, 'active'));
+  }
+
   async updateMatch(matchId: string, patch: Partial<typeof matches.$inferInsert>): Promise<MatchRow | null> {
     const [record] = await db.update(matches).set(patch).where(eq(matches.id, matchId)).returning();
     return record ?? null;

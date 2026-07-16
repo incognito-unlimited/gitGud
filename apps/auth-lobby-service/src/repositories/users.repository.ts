@@ -41,6 +41,7 @@ export class UsersRepository {
         winnerTeam: matchResults.winnerTeam,
         endingReason: matchResults.endingReason,
         createdAt: matches.createdAt,
+        timerSecondsRemaining: matches.timerSecondsRemaining,
       })
       .from(matches)
       .innerJoin(lobbyPlayers, and(eq(lobbyPlayers.lobbyId, matches.lobbyId), eq(lobbyPlayers.userId, userId)))

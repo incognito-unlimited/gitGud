@@ -95,10 +95,10 @@ export function DashboardPage({ user }: DashboardPageProps) {
       {/* Left Sidebar */}
       <nav className="dashboard-nav surface">
         <Link to="/dashboard" className="nav-item active">Home</Link>
-        <span className="nav-item" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Play</span>
-        <span className="nav-item" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Learn</span>
-        <span className="nav-item" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Leaderboard</span>
-        <span className="nav-item" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Settings</span>
+        <Link to="/lobbies/new" className="nav-item">Play</Link>
+        <span className="nav-item" style={{ opacity: 0.35, cursor: 'not-allowed' }} title="Coming soon">Learn</span>
+        <span className="nav-item" style={{ opacity: 0.35, cursor: 'not-allowed' }} title="Coming soon">Leaderboard</span>
+        <span className="nav-item" style={{ opacity: 0.35, cursor: 'not-allowed' }} title="Coming soon">Settings</span>
       </nav>
 
       {/* Main Content */}
@@ -227,13 +227,14 @@ export function DashboardPage({ user }: DashboardPageProps) {
                   matches.map((match: any) => {
                     const role = (match.roleAssignments as Record<string, string>)?.[user?.id ?? ''] ?? '—';
                     const won = match.winnerTeam === role;
+                    const timedOut = !match.winnerTeam && match.timerSecondsRemaining === 0;
+                    const resultLabel = match.winnerTeam ? (won ? 'Win' : 'Loss') : timedOut ? 'Timed out' : 'In progress';
+                    const resultColor = match.winnerTeam ? (won ? 'var(--success-color)' : 'var(--danger-color)') : timedOut ? 'var(--danger-color)' : 'var(--text-muted)';
                     return (
                       <tr key={match.id}>
                         <td>#{match.id.slice(0, 6).toUpperCase()}</td>
                         <td style={{ textTransform: 'capitalize' }}>{role}</td>
-                        <td style={{ color: match.winnerTeam ? (won ? 'var(--success-color)' : 'var(--danger-color)') : 'var(--text-muted)' }}>
-                          {match.winnerTeam ? (won ? 'Win' : 'Loss') : 'In progress'}
-                        </td>
+                        <td style={{ color: resultColor }}>{resultLabel}</td>
                         <td><Link to={`/matches/${match.id}`} className="text-button">Recap →</Link></td>
                       </tr>
                     );
