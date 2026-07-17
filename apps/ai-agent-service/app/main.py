@@ -6,6 +6,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
+from app.agents.recap_workflow import recap_app
+
 # Setup Rate Limiting
 limiter = Limiter(key_func=get_remote_address)
 
@@ -30,9 +32,23 @@ app.add_middleware(SlowAPIMiddleware)
 async def health_check(request):
     return {"status": "healthy", "service": "ai-agent-service"}
 
-# Placeholder for LangGraph Endpoint
-@app.post("/agent/invoke")
+# LangGraph Endpoint for Recap
+@app.post("/agent/recap")
 @limiter.limit("10/minute")
 async def invoke_agent(request, payload: dict):
-    # This will be replaced by actual LangGraph workflow invocation
-    return {"response": "LangGraph response placeholder", "echo": payload}
+    # Initial state
+    state = {
+        "match_id": payload.get("match_id", ""),
+        "winner_team": payload.get("winner_team", ""),
+        "ending_reason": payload.get("ending_reason", ""),
+        "player_role": payload.get("player_role", ""),
+        "player_username": payload.get("player_username", ""),
+        "tasks": payload.get("tasks", []),
+        "events": payload.get("events", []),
+        "recap": {}
+    }
+    
+    # Run the workflow
+    final_state = recap_app.invoke(state)
+    
+    return {"recap": final_state.get("recap", {})}
