@@ -1,7 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 
 import { db, lobbyPlayers, matchResults, matches, users } from '@gitgud/database';
-import type { GitHubProfile } from '../contracts';
+import type { GitHubProfile, GoogleProfile } from '../contracts';
 
 export class UsersRepository {
   async upsertGitHubUser(profile: GitHubProfile) {
@@ -16,6 +16,30 @@ export class UsersRepository {
       .onConflictDoUpdate({
         target: users.githubId,
         set: {
+          username: profile.username,
+          avatarUrl: profile.avatarUrl,
+          displayName: profile.displayName,
+        },
+      })
+      .returning();
+
+    return record;
+  }
+
+  async upsertGoogleUser(profile: GoogleProfile) {
+    const [record] = await db
+      .insert(users)
+      .values({
+        googleId: profile.googleId,
+        email: profile.email,
+        username: profile.username,
+        avatarUrl: profile.avatarUrl,
+        displayName: profile.displayName,
+      })
+      .onConflictDoUpdate({
+        target: users.googleId,
+        set: {
+          email: profile.email,
           username: profile.username,
           avatarUrl: profile.avatarUrl,
           displayName: profile.displayName,

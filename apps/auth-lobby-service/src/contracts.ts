@@ -7,6 +7,14 @@ export interface GitHubProfile {
   displayName: string;
 }
 
+export interface GoogleProfile {
+  googleId: string;
+  email: string;
+  username: string;
+  avatarUrl: string;
+  displayName: string;
+}
+
 export interface JwtClaims {
   userId: string;
   username: string;

@@ -6,6 +6,7 @@ import { db, users } from '@gitgud/database';
 
 import { authLobbyEnv } from '../config/env';
 import { authService } from '../services/auth.service';
+import { emailService } from '../services/email.service';
 import { UsersRepository } from '../repositories/users.repository';
 import type { CurrentUserResponse } from '../contracts';
 
@@ -42,6 +43,42 @@ export class AuthController {
       return response.redirect(redirectUrl.toString());
     } catch (err) {
       const message = err instanceof Error ? err.message : 'GitHub authentication failed.';
+      console.error('[OAuth] Authentication failed:', message);
+      const redirectUrl = new URL('/login', authLobbyEnv.frontendUrl);
+      redirectUrl.searchParams.set('error', message);
+      return response.redirect(redirectUrl.toString());
+    }
+  }
+
+  googleStart(_request: Request, response: Response) {
+    const state = randomUUID();
+    return response.redirect(authService.buildGoogleAuthorizeUrl(state));
+  }
+
+  async googleCallback(request: Request, response: Response) {
+    const code = typeof request.query.code === 'string' ? request.query.code : null;
+    const error = typeof request.query.error === 'string' ? request.query.error : null;
+
+    if (error) {
+      console.error('[OAuth] Google returned error:', error);
+      const redirectUrl = new URL('/login', authLobbyEnv.frontendUrl);
+      redirectUrl.searchParams.set('error', error);
+      return response.redirect(redirectUrl.toString());
+    }
+
+    if (!code) {
+      return response.status(400).send('Missing Google OAuth code.');
+    }
+
+    try {
+      const session = await authService.exchangeGoogleCode(code);
+      const redirectUrl = new URL('/auth/callback', authLobbyEnv.frontendUrl);
+      redirectUrl.searchParams.set('token', session.token);
+      redirectUrl.searchParams.set('userId', session.userId);
+
+      return response.redirect(redirectUrl.toString());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google authentication failed.';
       console.error('[OAuth] Authentication failed:', message);
       const redirectUrl = new URL('/login', authLobbyEnv.frontendUrl);
       redirectUrl.searchParams.set('error', message);
@@ -101,6 +138,10 @@ export class AuthController {
             avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`,
           })
           .returning();
+
+        if (email) {
+          emailService.sendWelcomeEmail(email, user.username);
+        }
       }
 
       const token = sign(
