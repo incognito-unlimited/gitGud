@@ -122,6 +122,10 @@ export class AuthController {
   }
 
   async devLogin(request: Request, response: Response) {
+    if (process.env.NODE_ENV === 'production') {
+      return response.status(403).json({ message: 'Dev login is disabled in production.' });
+    }
+
     try {
       const { username } = request.body;
       if (!username) return response.status(400).json({ message: 'Username is required' });

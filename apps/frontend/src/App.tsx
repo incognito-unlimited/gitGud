@@ -558,6 +558,7 @@ function LandingPage({ isAuthed }: { isAuthed: boolean }) {
 function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boolean }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [devUsername, setDevUsername] = useState('');
+  const enableGithubOAuth = import.meta.env.VITE_ENABLE_GITHUB_OAUTH === 'true';
 
   if (isAuthed) {
     return <Navigate to="/dashboard" replace />;
@@ -565,7 +566,7 @@ function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boole
 
   const handleLogin = () => {
     setIsRedirecting(true);
-    onLogin();
+    loginWithGitHub();
   };
 
   const handleDevLogin = async () => {
@@ -587,29 +588,34 @@ function LoginPage({ onLogin, isAuthed }: { onLogin: () => void; isAuthed: boole
         </div>
         <div>
           <h2 style={{ marginBottom: '8px' }}>Sign in to GitGud</h2>
-          <p className="muted" style={{ margin: '0' }}>We use your GitHub identity for profile and match history.</p>
+          <p className="muted" style={{ margin: '0' }}>
+            {enableGithubOAuth ? 'We use your GitHub identity for profile and match history.' : 'Enter a username for local development login.'}
+          </p>
         </div>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
-          <button className="button dark" style={{ width: '100%', padding: '16px' }} onClick={handleLogin}>
-            Continue with GitHub
-          </button>
-          
-          {isRedirecting && <p className="muted label" style={{ animation: 'pulse 1.5s infinite' }}>REDIRECTING TO GITHUB.COM/LOGIN...</p>}
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-          <p className="kicker muted">LOCAL DEVELOPMENT ONLY</p>
-          <input 
-            type="text" 
-            placeholder="Enter a test username..." 
-            value={devUsername} 
-            onChange={(e) => setDevUsername(e.target.value)} 
-            style={{ padding: '8px' }} 
-            onKeyDown={(e) => e.key === 'Enter' && handleDevLogin()}
-          />
-          <button className="button ghost" onClick={handleDevLogin}>Bypass GitHub Login</button>
-        </div>
+        {enableGithubOAuth ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
+            <button className="button dark" style={{ width: '100%', padding: '16px' }} onClick={handleLogin}>
+              Continue with GitHub
+            </button>
+            {isRedirecting && <p className="muted label" style={{ animation: 'pulse 1.5s infinite' }}>REDIRECTING TO GITHUB.COM/LOGIN...</p>}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+            <input 
+              type="text" 
+              placeholder="Enter username..." 
+              value={devUsername} 
+              onChange={(e) => setDevUsername(e.target.value)} 
+              style={{ padding: '12px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: '1rem' }} 
+              onKeyDown={(e) => e.key === 'Enter' && handleDevLogin()}
+              autoFocus
+            />
+            <button className="button dark" style={{ width: '100%', padding: '14px' }} onClick={handleDevLogin}>
+              Sign In (Dev Login)
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
           <span className="muted">Terms - Privacy</span>
