@@ -2,27 +2,12 @@
  * AI Game Master Agent
  * 
  * A multi-step agentic service that dynamically generates code faults
- * by reasoning over codebase structure, producing plausible bugs,
- * self-verifying they're syntactically valid, and adapting difficulty.
+ * by delegating to the FastAPI ai-agent-service over HTTP.
  * 
- * Uses Groq Cloud with llama-3.3-70b-versatile for inference.
- * Gracefully degrades to static task templates when GROQ_API_KEY is not set.
+ * Gracefully degrades to static task templates when the AI service is unreachable or errors.
  */
 
-import Groq from 'groq-sdk';
 import { gameEngineEnv } from '../config/env';
-import {
-  GAMEMASTER_SYSTEM_PROMPT,
-  buildFaultGenerationPrompt,
-  buildDifficultyAdaptationPrompt,
-} from './gamemaster.prompts';
-
-const MODEL = 'llama-3.3-70b-versatile';
-
-function getGroqClient(): Groq | null {
-  if (!gameEngineEnv.groqApiKey) return null;
-  return new Groq({ apiKey: gameEngineEnv.groqApiKey });
-}
 
 export interface GeneratedFault {
   title: string;
@@ -47,56 +32,19 @@ export interface DifficultyAdaptation {
   reasoning: string;
 }
 
-const FAULT_GENERATION_SCHEMA = {
-  type: 'object' as const,
-  properties: {
-    faults: {
-      type: 'array' as const,
-      items: {
-        type: 'object' as const,
-        properties: {
-          title: { type: 'string' as const, description: 'Short task title' },
-          description: { type: 'string' as const, description: 'Description of what needs to be fixed' },
-          difficulty: { type: 'string' as const, enum: ['easy', 'medium', 'hard'] },
-          isSabotage: { type: 'boolean' as const, description: 'True if this is an imposter-injected fault' },
-          faultType: { type: 'string' as const, description: 'e.g. off-by-one, null-propagation, missing-await' },
-          faultReasoning: { type: 'string' as const, description: 'Why this fault is plausible and hard to catch' },
-          targetConcept: { type: 'string' as const, description: 'Learning concept this tests' },
-          codeSnippet: { type: 'string' as const, description: 'The broken code the player sees' },
-          expectedSolution: { type: 'string' as const, description: 'The correct version of the code' },
-          commitMessage: { type: 'string' as const, description: 'A plausible-looking commit message' },
-          syntacticallyValid: { type: 'boolean' as const, description: 'Does this code look syntactically valid?' },
-          wouldFailTest: { type: 'boolean' as const, description: 'Would a test for correct behavior fail?' },
-          difficultyScore: { type: 'number' as const, description: 'Granular difficulty 1-10' },
-        },
-        required: [
-          'title', 'description', 'difficulty', 'isSabotage', 'faultType',
-          'faultReasoning', 'targetConcept', 'codeSnippet', 'expectedSolution',
-          'commitMessage', 'syntacticallyValid', 'wouldFailTest', 'difficultyScore',
-        ],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ['faults'],
-  additionalProperties: false,
-};
-
 export class GameMasterAgent {
-  private client: Groq | null;
+  private serviceUrl: string;
 
   constructor() {
-    this.client = getGroqClient();
+    this.serviceUrl = gameEngineEnv.aiAgentServiceUrl;
   }
 
   get isAvailable(): boolean {
-    return this.client !== null;
+    return Boolean(this.serviceUrl);
   }
 
   /**
-   * Step 1-3: Generate faults by reasoning over the codebase.
-   * The LLM analyzes the codebase, generates plausible bugs,
-   * and self-verifies they're syntactically valid but would fail tests.
+   * Generate faults by delegating to the FastAPI ai-agent-service via HTTP.
    */
   async generateFaults(
     playerCount: number,
@@ -105,56 +53,34 @@ export class GameMasterAgent {
     completedTaskCount: number,
     totalTaskCount: number,
   ): Promise<GeneratedFault[]> {
-    if (!this.client) {
-      console.log('[GameMaster] No Groq API key — using static fallback');
-      return this.staticFallback();
-    }
-
     try {
-      console.log(`[GameMaster] Generating faults for ${playerCount} players, round ${currentRound}, trend: ${difficultyTrend}`);
+      console.log(`[GameMaster] Requesting faults from AI service (${this.serviceUrl}) for ${playerCount} players, round ${currentRound}, trend: ${difficultyTrend}`);
 
-      const userPrompt = buildFaultGenerationPrompt(
-        playerCount, currentRound, difficultyTrend, completedTaskCount, totalTaskCount,
-      );
-
-      const response = await this.client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: GAMEMASTER_SYSTEM_PROMPT + '\n\nYou must respond with a JSON object matching this schema: ' + JSON.stringify(FAULT_GENERATION_SCHEMA) },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.8,
-        max_completion_tokens: 4096,
-        response_format: { type: 'json_object' },
+      const response = await fetch(`${this.serviceUrl}/agent/generate-faults`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          player_count: playerCount,
+          current_round: currentRound,
+          difficulty_trend: difficultyTrend,
+          completed_task_count: completedTaskCount,
+          total_task_count: totalTaskCount,
+        }),
       });
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        console.error('[GameMaster] Empty response from Groq');
+      if (!response.ok) {
+        console.error(`[GameMaster] AI service returned HTTP status ${response.status}`);
         return this.staticFallback();
       }
 
-      const parsed = JSON.parse(content);
-      const faults: GeneratedFault[] = (parsed.faults || []).map((f: any) => ({
-        title: f.title,
-        description: f.description,
-        difficulty: f.difficulty,
-        isSabotage: f.isSabotage,
-        faultType: f.faultType,
-        faultReasoning: f.faultReasoning,
-        targetConcept: f.targetConcept,
-        codeSnippet: f.codeSnippet,
-        expectedSolution: f.expectedSolution,
-        commitMessage: f.commitMessage,
-        verificationResult: {
-          syntacticallyValid: f.syntacticallyValid ?? true,
-          wouldFailTest: f.wouldFailTest ?? true,
-        },
-        difficultyScore: f.difficultyScore ?? 5,
-      }));
+      const data = (await response.json()) as { faults?: GeneratedFault[] };
+      if (!data.faults || !Array.isArray(data.faults) || data.faults.length === 0) {
+        console.log('[GameMaster] AI service returned empty faults array — using static fallback');
+        return this.staticFallback();
+      }
 
-      console.log(`[GameMaster] Generated ${faults.length} faults`);
-      return faults;
+      console.log(`[GameMaster] Generated ${data.faults.length} faults via AI service`);
+      return data.faults;
     } catch (error) {
       console.error('[GameMaster] Fault generation failed:', error);
       return this.staticFallback();
@@ -162,7 +88,7 @@ export class GameMasterAgent {
   }
 
   /**
-   * Step 4: Adapt difficulty based on match progress.
+   * Adapt difficulty by delegating to the FastAPI ai-agent-service via HTTP.
    */
   async adaptDifficulty(
     completedTaskCount: number,
@@ -171,40 +97,26 @@ export class GameMasterAgent {
     currentRound: number,
     currentTrend: string,
   ): Promise<DifficultyAdaptation> {
-    if (!this.client) {
-      return { trend: 'normal', reasoning: 'No AI available — using default difficulty.' };
-    }
-
     try {
-      const prompt = buildDifficultyAdaptationPrompt(
-        completedTaskCount, totalTaskCount, averageCompletionTimeSeconds,
-        currentRound, currentTrend,
-      );
-
-      const response = await this.client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: GAMEMASTER_SYSTEM_PROMPT },
-          { role: 'user', content: prompt + '\n\nYou must respond with a JSON object matching this schema: ' + JSON.stringify({
-            type: 'object',
-            properties: {
-              trend: { type: 'string', enum: ['easy', 'normal', 'hard', 'escalating'] },
-              reasoning: { type: 'string' },
-            },
-            required: ['trend', 'reasoning']
-          }) },
-        ],
-        temperature: 0.3,
-        max_completion_tokens: 256,
-        response_format: { type: 'json_object' },
+      const response = await fetch(`${this.serviceUrl}/agent/adapt-difficulty`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          completed_task_count: completedTaskCount,
+          total_task_count: totalTaskCount,
+          average_completion_time_seconds: averageCompletionTimeSeconds,
+          current_round: currentRound,
+          current_trend: currentTrend,
+        }),
       });
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) return { trend: 'normal', reasoning: 'Empty response.' };
+      if (!response.ok) {
+        return { trend: currentTrend as DifficultyAdaptation['trend'], reasoning: 'AI service request failed.' };
+      }
 
-      const parsed = JSON.parse(content);
-      console.log(`[GameMaster] Difficulty adaptation: ${parsed.trend} — ${parsed.reasoning}`);
-      return parsed;
+      const data = (await response.json()) as DifficultyAdaptation;
+      console.log(`[GameMaster] Difficulty adaptation: ${data.trend} — ${data.reasoning}`);
+      return data;
     } catch (error) {
       console.error('[GameMaster] Difficulty adaptation failed:', error);
       return { trend: currentTrend as DifficultyAdaptation['trend'], reasoning: 'Error during adaptation.' };
@@ -212,8 +124,7 @@ export class GameMasterAgent {
   }
 
   /**
-   * Static fallback when Groq API key is not available.
-   * Returns the same static tasks the old buildTaskTemplates() produced.
+   * Static fallback when AI service is unreachable or errors.
    */
   private staticFallback(): GeneratedFault[] {
     return [

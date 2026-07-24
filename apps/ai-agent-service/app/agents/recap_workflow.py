@@ -89,8 +89,9 @@ workflow = StateGraph(MatchDataState)
 # Add node
 workflow.add_node("generate_recap", generate_recap_node)
 
-# Add edges
+# Add edges     
 workflow.set_entry_point("generate_recap")
+# workflow.add_edge(START, "generate_recap")
 workflow.add_edge("generate_recap", END)
 
 # Compile

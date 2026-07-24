@@ -33,4 +33,5 @@ export const gameEngineEnv = {
   port: readNumberEnv('GAME_ENGINE_PORT', readNumberEnv('PORT', 4102)),
   jwtSecret: readRequiredEnv('JWT_SECRET', 'gitgud-dev-secret'),
   groqApiKey: process.env.GROQ_API_KEY ?? '',
+  aiAgentServiceUrl: process.env.AI_AGENT_SERVICE_URL || 'http://localhost:8001',
 };
